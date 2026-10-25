@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DBRAIT Repository</title>
+<style>
+:root{--bg:#eef3f1;--card:#fff;--ink:#10292b;--mut:#5a7274;--line:#d3e0dd;--acc:#0b7a75;--accink:#fff;--warn:#c2410c;--ok:#2f7d4f;--bar:#dbe7e4}
+:root[data-theme=dark]{--bg:#0b1719;--card:#12262a;--ink:#e4efec;--mut:#8ca7a6;--line:#25403f;--acc:#3fc1b5;--accink:#062022;--warn:#f0905f;--ok:#7bd19a;--bar:#1d3638}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0b1719;--card:#12262a;--ink:#e4efec;--mut:#8ca7a6;--line:#25403f;--acc:#3fc1b5;--accink:#062022;--warn:#f0905f;--ok:#7bd19a;--bar:#1d3638}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:Georgia,"Iowan Old Style",serif;font-weight:600;margin:0}
+header{display:flex;align-items:center;gap:16px;padding:14px 24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:22px}header small{color:var(--mut)}nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+button,select,input{font:inherit;color:inherit}
+.tab,.btn,.chip{border:1px solid var(--line);background:var(--card);padding:7px 14px;border-radius:8px;cursor:pointer}
+.tab[aria-selected=true],.chip[aria-pressed=true]{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.btn.p{background:var(--acc);color:var(--accink);border-color:var(--acc)}.btn.d{color:var(--warn)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+main{max-width:1000px;margin:0 auto;padding:24px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+input,select{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+.paper{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.paper b{font-family:Georgia,serif}.meta{color:var(--mut);font-size:14px}
+.tag{font-size:13px;border:1px solid var(--line);border-radius:99px;padding:1px 9px;margin-right:6px}
+.bar{height:10px;background:var(--bar);border-radius:6px;position:relative;margin:8px 0}
+.bar i{display:block;height:100%;border-radius:6px;background:var(--ok)}.bar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);left:75%}
+.bad i{background:var(--warn)}.big{font:600 40px Georgia,serif}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);max-width:460px;width:92%}
+label{display:block;font-size:14px;color:var(--mut);margin-top:10px}label input,label select{width:100%;margin-top:3px}
+.empty{color:var(--mut);padding:30px 0;text-align:center}.err{color:var(--warn);min-height:1.4em}
+@media(prefers-reduced-motion:no-preference){.bar i{transition:width .4s}}
+</style></head><body>
+<header><h1>DBRAIT Repository</h1><small>B.Tech CSE · student managed</small>
+<nav id="nav"></nav><button class="btn" id="theme" aria-label="Switch light or dark mode">Dark mode</button></header>
+<main id="app"></main>
+<dialog id="dlg"></dialog>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let ME=null,TAB="papers",SEM=5,COURSES=[];
+async function api(url,opt={}){const r=await fetch(url,opt);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||"Something went wrong.");return d}
+const J=(m,b)=>({method:m,headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
+function theme(t){document.documentElement.dataset.theme=t;localStorage.setItem("th",t);$("#theme").textContent=t=="dark"?"Light mode":"Dark mode"}
+theme(localStorage.getItem("th")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"));
+$("#theme").onclick=()=>theme(document.documentElement.dataset.theme=="dark"?"light":"dark");
+
+async function boot(){ME=await api("/api/me");COURSES=await api("/api/courses");nav();render()}
+function nav(){const t=[["papers","Question papers"],["att","Attendance"],["grades","SGPA / CGPA"]];if(ME?.role=="admin")t.push(["admin","Admin"]);
+ $("#nav").innerHTML=ME?t.map(([k,l])=>`<button class="tab" aria-selected="${TAB==k}" data-k="${k}">${l}</button>`).join("")+`<button class="tab" id="out">Log out (${esc(ME.name)})</button>`:"";
+ document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{TAB=b.dataset.k;nav();render()});
+ if(ME)$("#out").onclick=async()=>{await api("/api/logout",{method:"POST"});ME=null;nav();render()}}
+function render(){if(!ME)return authView();({papers:papersView,att:attView,grades:gradesView,admin:adminView})[TAB]()}
+
+function authView(){$("#app").innerHTML=`<div class="card" style="max-width:420px;margin:40px auto"><h2>Sign in</h2>
+<p class="meta">Browse and upload question papers, track attendance, plan your SGPA.</p>
+<label>Username<input id="u" autocomplete="username"></label><label>Password<input id="p" type="password" autocomplete="current-password"></label>
+<label id="nl" hidden>Your name<input id="n"></label><p class="err" id="e"></p>
+<div class="row"><button class="btn p" id="go">Log in</button><button class="btn" id="sw">Create student account</button></div></div>`;
+ let reg=false;$("#sw").onclick=()=>{reg=!reg;$("#nl").hidden=!reg;$("#go").textContent=reg?"Create account":"Log in";$("#sw").textContent=reg?"I already have an account":"Create student account"};
+ $("#go").onclick=async()=>{try{await api(reg?"/api/register":"/api/login",J("POST",{username:$("#u").value,password:$("#p").value,name:$("#n").value}));boot()}catch(e){$("#e").textContent=e.message}}}
+
+async function papersView(){
+ const f=window.F||(window.F={q:"",course:0,cat:"",att:""});
+ const cs=COURSES.filter(c=>c.sem==SEM);
+ $("#app").innerHTML=`<h2>Question papers</h2><div class="row" id="sems">${[1,2,3,4,5,6,7,8].map(s=>`<button class="chip" aria-pressed="${s==SEM}" data-s="${s}">Sem ${s}</button>`).join("")}</div>
+ <div class="row"><input id="q" placeholder="Search subject, code, year…" value="${esc(f.q)}" style="flex:1;min-width:180px">
+ <select id="fc"><option value="0">All subjects</option>${cs.map(c=>`<option value="${c.id}" ${f.course==c.id?"selected":""}>${esc(c.code)} ${esc(c.name)}</option>`).join("")}</select>
+ <select id="fa"><option value="">All attempts</option>${ATT.map(a=>`<option ${f.att==a?"selected":""}>${a}</option>`).join("")}</select>
+ <button class="btn p" id="up">Upload a paper</button></div><div id="list"></div>`;
+ document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{SEM=+b.dataset.s;f.course=0;papersView()});
+ $("#q").oninput=e=>{f.q=e.target.value;load()};$("#fc").onchange=e=>{f.course=+e.target.value;load()};$("#fa").onchange=e=>{f.att=e.target.value;load()};$("#up").onclick=uploadDlg;load();
+ async function load(){const p=new URLSearchParams({sem:SEM,course_id:f.course,q:f.q,attempt:f.att});const rows=await api("/api/papers?"+p);
+  $("#list").innerHTML=rows.length?rows.map(r=>`<div class="card paper"><div><b>${esc(r.title)}</b><div class="meta"><span class="tag">${esc(r.category)}</span><span class="tag">${esc(r.attempt)}</span>${r.year}${r.session?" · "+esc(r.session):""} · by ${esc(r.uname)}</div></div>
+  <div class="row" style="margin:0"><a class="btn" href="/files/${r.filename}" target="_blank" rel="noopener">Open</a>${ME.role=="admin"||ME.id==r.uploader?`<button class="btn d" data-r="${r.id}">Remove</button>`:""}</div></div>`).join("")
+  :`<div class="empty">No papers for Semester ${SEM} yet. Upload the first one.</div>`;
+  document.querySelectorAll("[data-r]").forEach(b=>b.onclick=async()=>{if(confirm("Remove this paper?")){await api("/api/papers/"+b.dataset.r,{method:"DELETE"});load()}})}}
+const ATT=["1st Attempt (Regular)","2nd Attempt (1st Supplementary)","3rd Attempt","4th+ Attempt (Special Carry-Over)"],CATS=["University End-Sem","Internal Test","Notes"];
+function uploadDlg(){const d=$("#dlg"),cs=COURSES.filter(c=>c.sem==SEM);
+ d.innerHTML=`<form method="dialog" id="uf"><h3>Upload a paper · Semester ${SEM}</h3>
+ <label>Subject<select name="course_id">${cs.map(c=>`<option value="${c.id}">${esc(c.code)} ${esc(c.name)}</option>`).join("")}</select></label>
+ <label>Type<select name="category">${CATS.map(a=>`<option>${a}</option>`).join("")}</select></label>
+ <label>Attempt<select name="attempt">${ATT.map(a=>`<option>${a}</option>`).join("")}</select></label>
+ <label>Exam year<input name="year" type="number" value="${new Date().getFullYear()}" required></label>
+ <label>Session (optional)<input name="session" placeholder="e.g. May/June"></label>
+ <label>File (PDF or photo)<input name="file" type="file" accept=".pdf,image/*" required></label><p class="err" id="ue"></p>
+ <div class="row"><button class="btn p" value="go">Upload</button><button class="btn" value="x" formnovalidate>Cancel</button></div></form>`;
+ d.showModal();$("#uf").onsubmit=async e=>{if(e.submitter.value!="go")return;e.preventDefault();try{await api("/api/papers",{method:"POST",body:new FormData($("#uf"))});d.close();papersView()}catch(x){$("#ue").textContent=x.message}}}
+
+async function attView(){const rows=await api("/api/attendance?sem="+SEM);
+ $("#app").innerHTML=`<h2>Attendance</h2><p class="meta">Counted subject by subject. 75% or more makes you eligible. Between 65% and 75% the HoD may allow you with a medical certificate (₹150 per subject) or for approved activities (no fee). Below 65% in any subject means repeating the semester.</p>
+ <div class="row">${[1,2,3,4,5,6,7,8].map(s=>`<button class="chip" aria-pressed="${s==SEM}" data-s="${s}">Sem ${s}</button>`).join("")}</div>
+ ${rows.map(r=>{const bad=r.pct!==null&&r.pct<75;return `<div class="card" data-c="${r.course_id}"><div class="paper"><b>${esc(r.code)} ${esc(r.name)}</b><span class="meta">${r.pct===null?"No classes yet":r.pct+"% · "+esc(r.status)+(r.fee?` · fee ₹${r.fee}`:"")}</span></div>
+ <div class="bar ${bad?"bad":""}"><i style="width:${Math.min(r.pct||0,100)}%"></i><u></u></div>
+ <div class="row"><label style="margin:0">Attended <input type="number" min="0" value="${r.attended}" data-f="attended" style="width:90px"></label><label style="margin:0">Total <input type="number" min="0" value="${r.total}" data-f="total" style="width:90px"></label>
+ <label style="margin:0"><input type="checkbox" data-f="medical" ${r.medical?"checked":""} style="width:auto"> Medical</label><label style="margin:0"><input type="checkbox" data-f="activity" ${r.activity?"checked":""} style="width:auto"> NSS/NCC/sports</label>
+ <span class="meta">${r.total?(r.delta>0?`Attend the next ${r.delta} classes to reach 75%`:`You can miss ${-r.delta} more and stay at 75%`):""}</span></div></div>`}).join("")}`;
+ document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{SEM=+b.dataset.s;attView()});
+ document.querySelectorAll("[data-c]").forEach(card=>card.querySelectorAll("[data-f]").forEach(i=>i.onchange=async()=>{const g=f=>card.querySelector(`[data-f=${f}]`);
+  try{await api("/api/attendance",J("PUT",{course_id:+card.dataset.c,attended:+g("attended").value,total:+g("total").value,medical:g("medical").checked,activity:g("activity").checked}));attView()}catch(e){alert(e.message)}}))}
+
+async function gradesView(){const d=await api("/api/grades"),opts=["",...Object.keys(d.scale),"MP"];
+ $("#app").innerHTML=`<h2>SGPA / CGPA</h2><div class="card"><span class="meta">Cumulative (CGPA)</span><div class="big">${d.cgpa??"–"}</div><span class="meta">Pick the grade you got for each theory and lab. MP (mandatory pass) is left out of the calculation.</span></div>
+ ${d.semesters.map(s=>`<div class="card"><div class="paper"><h3>Semester ${s.sem}</h3><span class="big" style="font-size:28px">${s.sgpa??"–"}</span></div><div class="grid">${s.comps.map(c=>`<label>${esc(c.code)} · ${esc(c.course)} <span class="meta">(${c.credits} cr)</span>
+ <select data-k="${esc(c.code)}">${opts.map(o=>`<option ${o==c.grade?"selected":""}>${o}</option>`).join("")}</select></label>`).join("")}</div></div>`).join("")}`;
+ document.querySelectorAll("[data-k]").forEach(s=>s.onchange=async()=>{await api("/api/grades",J("PUT",{comp:s.dataset.k,grade:s.value}));const y=scrollY;await gradesView();scrollTo(0,y)})}
+
+function adminView(){$("#app").innerHTML=`<h2>Admin</h2><div class="card"><h3>Create a faculty login</h3><p class="meta">Faculty are regular users with a generated ID. Share the ID and password with them.</p>
+ <div class="row"><input id="fn" placeholder="Faculty name"><button class="btn p" id="mk">Generate login</button></div><p id="fr"></p></div>`;
+ $("#mk").onclick=async()=>{try{const r=await api("/api/admin/faculty",J("POST",{username:"x",password:"x",name:$("#fn").value}));$("#fr").innerHTML=`Username <b>${esc(r.username)}</b> · Password <b>${esc(r.password)}</b>`}catch(e){$("#fr").textContent=e.message}}}
+boot();
+</script></body></html>
